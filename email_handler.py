@@ -22,6 +22,7 @@ from datetime import datetime
 IMAP_HOST = "imap.gmail.com"
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
+SMTP_PORT_SSL = 465
 
 CV_DIR = "data/cvs"
 
@@ -444,25 +445,8 @@ class EmailHandler:
         """
         Send a beautifully formatted HTML email with Reliv branding.
 
-        The email includes:
-        - Reliv logo rendered as styled HTML (no PNG attachment)
-        - Professional gradient header
-        - WhatsApp community join link
-        - Instagram follow CTA
-        - Formal footer with copyright
-
-        Parameters
-        ----------
-        to_email : str
-            Recipient email address.
-        subject : str
-            Email subject line.
-        body : str
-            Plain-text body content (will be wrapped in HTML template).
-        from_name : str
-            Display name for the From field.
-        decision : str
-            'accepted' or 'rejected' — controls colour accent.
+        Uses SMTP_SSL on port 465 (direct SSL — faster and more reliable
+        than port 587 STARTTLS which can hang on some networks).
         """
 
         html_body = build_html_email(body, decision=decision)
@@ -488,23 +472,39 @@ class EmailHandler:
         msg.attach(part_text)
         msg.attach(part_html)
 
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-            server.starttls()
+        # Use SMTP_SSL (port 465) — direct SSL, no STARTTLS negotiation needed.
+        # Faster and more reliable than port 587.
+        # Timeout of 15 seconds prevents hanging.
+        try:
+            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT_SSL, timeout=15)
             server.login(self.email_address, self.app_password)
             server.send_message(msg)
+            server.quit()
+        except smtplib.SMTPAuthenticationError as e:
+            raise RuntimeError(
+                f"Gmail authentication failed. Check your App Password. ({e.smtp_code})"
+            ) from e
+        except smtplib.SMTPException as e:
+            raise RuntimeError(f"SMTP error: {e}") from e
+        except TimeoutError:
+            raise RuntimeError(
+                "Connection to Gmail timed out (15s). Check your internet connection."
+            )
+        except OSError as e:
+            raise RuntimeError(f"Network error connecting to Gmail: {e}") from e
 
     def verify_credentials(self) -> tuple[bool, str]:
         """Test both IMAP and SMTP login."""
         try:
-            imap = imaplib.IMAP4_SSL(IMAP_HOST)
+            imap = imaplib.IMAP4_SSL(IMAP_HOST, timeout=10)
             imap.login(self.email_address, self.app_password)
             imap.logout()
         except Exception as e:
             return False, f"IMAP login failed: {e}"
         try:
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-                server.starttls()
-                server.login(self.email_address, self.app_password)
+            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT_SSL, timeout=10)
+            server.login(self.email_address, self.app_password)
+            server.quit()
         except Exception as e:
             return False, f"SMTP login failed: {e}"
         return True, "OK"
