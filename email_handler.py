@@ -17,7 +17,15 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import parsedate_to_datetime, formataddr
 from datetime import datetime
+import socket
 
+# FORCE IPv4 to avoid [Errno 101] Network is unreachable on broken IPv6 connections
+_orig_getaddrinfo = socket.getaddrinfo
+def _ipv4_getaddrinfo(*args, **kwargs):
+    res = _orig_getaddrinfo(*args, **kwargs)
+    # Filter to only return IPv4 (AF_INET)
+    return [r for r in res if r[0] == socket.AF_INET]
+socket.getaddrinfo = _ipv4_getaddrinfo
 
 IMAP_HOST = "imap.gmail.com"
 SMTP_HOST = "smtp.gmail.com"
