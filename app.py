@@ -371,6 +371,12 @@ def fetch():
 
         cfg = load_config()
 
+        if not cfg.get("email_address") or not cfg.get("app_password"):
+            return jsonify({
+                "ok": False,
+                "error": "Gmail credentials not configured. Go to Settings → Credentials and save your Gmail address + App Password first."
+            }), 400
+
         handler = EmailHandler(
             cfg["email_address"],
             cfg["app_password"]
@@ -508,6 +514,13 @@ def decide(applicant_id: int):
         abort(404)
 
     cfg = load_config()
+
+    if not cfg.get("email_address") or not cfg.get("app_password"):
+        conn.close()
+        return jsonify({
+            "ok": False,
+            "error": "Gmail credentials not configured. Go to Settings → Credentials and save your Gmail address + App Password first."
+        }), 400
 
     handler = EmailHandler(
         cfg["email_address"],
