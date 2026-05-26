@@ -475,8 +475,14 @@ class EmailHandler:
         # Use SMTP_SSL (port 465) — direct SSL, no STARTTLS negotiation needed.
         # Faster and more reliable than port 587.
         # Timeout of 15 seconds prevents hanging.
+        # We explicitly bind to IPv4 ('0.0.0.0') to avoid [Errno 101] Network Unreachable on flaky IPv6 networks.
         try:
-            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT_SSL, timeout=15)
+            server = smtplib.SMTP_SSL(
+                SMTP_HOST, 
+                SMTP_PORT_SSL, 
+                timeout=15, 
+                source_address=('0.0.0.0', 0)
+            )
             server.login(self.email_address, self.app_password)
             server.send_message(msg)
             server.quit()
@@ -502,7 +508,12 @@ class EmailHandler:
         except Exception as e:
             return False, f"IMAP login failed: {e}"
         try:
-            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT_SSL, timeout=10)
+            server = smtplib.SMTP_SSL(
+                SMTP_HOST, 
+                SMTP_PORT_SSL, 
+                timeout=10, 
+                source_address=('0.0.0.0', 0)
+            )
             server.login(self.email_address, self.app_password)
             server.quit()
         except Exception as e:
