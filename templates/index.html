@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reliv - Recruitment Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="logo">R</div>
+    <div>
+      <h1>Reliv Recruitment</h1>
+      <p class="sub">Smart inbox - accept / reject / manage</p>
+    </div>
+  </div>
+  <div class="toolbar">
+    <button id="btn-export" class="btn ghost">Export CSV</button>
+    <button id="btn-fetch" class="btn primary">
+      <span class="spinner hidden" id="fetch-spin"></span>
+      Fetch Emails
+    </button>
+    <button id="btn-settings" class="btn ghost">Settings</button>
+    <button id="btn-logout" class="btn ghost" style="color:var(--red)">Logout</button>
+  </div>
+</header>
+
+<!-- ===== STATS ===== -->
+<section class="stats" id="stats">
+  <div class="stat-card clickable" data-tab="all"><div class="stat-num" id="stat-total">0</div><div class="stat-lbl">Total</div></div>
+  <div class="stat-card pending clickable" data-tab="pending"><div class="stat-num" id="stat-pending">0</div><div class="stat-lbl">Pending</div></div>
+  <div class="stat-card accepted clickable" data-tab="accepted"><div class="stat-num" id="stat-accepted">0</div><div class="stat-lbl">Accepted</div></div>
+  <div class="stat-card rejected clickable" data-tab="rejected"><div class="stat-num" id="stat-rejected">0</div><div class="stat-lbl">Rejected</div></div>
+</section>
+
+<!-- ===== STATUS TABS ===== -->
+<nav class="status-tabs">
+  <button class="stab active" data-status="all">All</button>
+  <button class="stab" data-status="pending">Pending <span id="tab-pending-n"></span></button>
+  <button class="stab" data-status="accepted">Accepted <span id="tab-accepted-n"></span></button>
+  <button class="stab" data-status="rejected">Rejected <span id="tab-rejected-n"></span></button>
+</nav>
+
+<!-- ===== TOOLBAR ===== -->
+<section class="list-toolbar">
+  <div class="left-tools">
+    <label class="checkbox-wrap" title="Select all visible">
+      <input type="checkbox" id="select-all" />
+      <span>Select all</span>
+    </label>
+    <select id="sort-select">
+      <option value="newest">Newest first</option>
+      <option value="oldest">Oldest first</option>
+      <option value="name">Name A-Z</option>
+    </select>
+    <select id="position-filter">
+      <option value="all">All positions</option>
+    </select>
+  </div>
+  <div class="right-tools">
+    <input id="search" type="search" placeholder="Search name, email, domain, position..." />
+  </div>
+</section>
+
+<!-- ===== BULK BAR ===== -->
+<section class="bulk-bar hidden" id="bulk-bar">
+  <span id="bulk-count">0 selected</span>
+  <button class="btn accept sm" id="bulk-accept">Accept All</button>
+  <button class="btn reject sm" id="bulk-reject">Reject All</button>
+  <button class="btn ghost sm" id="bulk-reset">Reset to Pending</button>
+  <button class="btn danger-ghost sm" id="bulk-delete">Delete</button>
+  <button class="btn ghost sm" id="bulk-clear">Clear</button>
+</section>
+
+<!-- ===== TABLE ===== -->
+<main id="table-wrap">
+  <table class="app-table" id="app-table">
+    <thead>
+      <tr>
+        <th class="th-check"></th>
+        <th>Applicant</th>
+        <th>Position</th>
+        <th>Score</th>
+        <th>Domains</th>
+        <th>CV</th>
+        <th>Date</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <div class="empty hidden" id="empty-msg">No applicants found. Click <strong>Fetch Emails</strong> to pull from Gmail.</div>
+</main>
+
+<!-- ===== Detail modal ===== -->
+<div class="modal-backdrop hidden" id="modal">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="m-title">Applicant</h2>
+      <button class="x" id="m-close">&times;</button>
+    </div>
+    <div class="modal-body" id="m-body"></div>
+  </div>
+</div>
+
+<!-- ===== Settings modal ===== -->
+<div class="modal-backdrop hidden" id="settings-modal">
+  <div class="modal wide">
+    <div class="modal-head">
+      <h2>Settings</h2>
+      <button class="x" id="s-close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="tabs">
+        <button class="tab active" data-tab="creds">Credentials</button>
+        <button class="tab" data-tab="templates">Email Templates</button>
+        <button class="tab" data-tab="security">Security</button>
+      </div>
+      <div class="tab-panel" data-panel="creds">
+        <div class="hint">Gmail <strong>App Password</strong> required. Get one at myaccount.google.com -> Security -> App passwords.</div>
+        <label>Gmail address</label>
+        <input id="cfg-email" type="email" />
+        <label>App password</label>
+        <input id="cfg-password" type="password" placeholder="xxxx xxxx xxxx xxxx" />
+        <label>From name</label>
+        <input id="cfg-from" type="text" value="Team Reliv" />
+        <div class="row">
+          <div class="col"><label>Subject keyword</label><input id="cfg-keyword" type="text" value="Applicant Info" /></div>
+          <div class="col"><label>Look back (days)</label><input id="cfg-days" type="number" value="730" /></div>
+        </div>
+        <div class="actions">
+          <button id="cfg-verify" class="btn ghost">Test connection</button>
+          <button id="cfg-save" class="btn primary">Save</button>
+        </div>
+        <div id="cfg-status" class="status"></div>
+      </div>
+      <div class="tab-panel hidden" data-panel="templates">
+        <div class="hint">Placeholders: <code>{name}</code>, <code>{full_name}</code>, <code>{position}</code>, <code>{email}</code>, <code>{domains}</code></div>
+        <label>Template for position</label>
+        <div class="tpl-picker">
+          <select id="tpl-select"></select>
+          <input id="tpl-new" placeholder="New position name..." />
+          <button class="btn ghost" id="tpl-add">+ Add</button>
+        </div>
+        <div class="tpl-section"><h3>Acceptance email</h3>
+          <label>Subject</label><input id="tpl-accept-sub" type="text" />
+          <label>Body</label><textarea id="tpl-accept-body" rows="8"></textarea>
+        </div>
+        <div class="tpl-section"><h3>Rejection email</h3>
+          <label>Subject</label><input id="tpl-reject-sub" type="text" />
+          <label>Body</label><textarea id="tpl-reject-body" rows="6"></textarea>
+        </div>
+        <div class="actions"><button id="tpl-save" class="btn primary">Save templates</button></div>
+        <div id="tpl-status" class="status"></div>
+      </div>
+      <div class="tab-panel hidden" data-panel="security">
+        <div class="hint">Change the dashboard login password. This is separate from the Gmail app password.</div>
+        <label>Current password</label>
+        <input id="sec-old" type="password" />
+        <label>New password</label>
+        <input id="sec-new" type="password" />
+        <label>Confirm new password</label>
+        <input id="sec-confirm" type="password" />
+        <div class="actions"><button id="sec-save" class="btn primary">Change Password</button></div>
+        <div id="sec-status" class="status"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
